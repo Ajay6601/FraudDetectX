@@ -1,13 +1,18 @@
 import json
 import os
 import signal
-from datetime import time, timezone, datetime, timedelta
-from random import random
+import random
+import time
+from datetime import timezone, datetime, timedelta
 from typing import Optional, Dict, Any
 from confluent_kafka import Producer
 from dotenv import load_dotenv
 import logging
 from faker import Faker
+from jsonschema import validate,ValidationError, FormatChecker
+from typing import Dict, Any
+# from pydantic import ValidationError
+# from pylint.checkers.format import FormatChecker
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(module)s - %(message)s",
@@ -18,6 +23,48 @@ logger=logging.getLogger(__name__)
 load_dotenv(dotenv_path="/app/.env")
 
 fake=Faker()
+
+TRANSACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "transaction_id": {"type": "string"},
+        "user_id": {"type": "number", "minimum": 1000, "maximum": 9999},
+        "amount": {"type": "number", "minimum": 0.01, "maximum": 10000},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "merchant": {"type": "string"},
+        "timestamp": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "location": {"type": "string", "pattern": "^[A-Z]{2}$"},
+        "is_fraud": {"type": "integer", "minimum": 0, "maximum": 1}
+    },
+    "required": ["transaction_id", "user_id", "amount", "currency", "timestamp",'is_fraud']
+}
+
+
+def validate_transaction(transaction:Dict[str,Any]) -> bool:
+    try:
+        validate(
+            instance=transaction,
+            schema=TRANSACTION_SCHEMA,
+            format_checker=FormatChecker()
+        )
+        return True
+    except ValidationError as e:
+        logger.error(f'Invalid transaction:{e.message}')
+        return False
+
+
+def delivery_report(err, msg):
+    """Usage: Callback function for message delivery reports"""
+
+    if err is not None:
+        logger.error(f"Message delivery failed: {err}")
+    else:
+        logger.info(f"Message delivered to {msg.topic()} [{msg.partition()}]!")
+
+
 class TransactionProducer:
     def __init__(self):
         self.bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
@@ -64,47 +111,78 @@ class TransactionProducer:
         signal.signal(signal.SIGINT, self.shutdown)
         signal.signal(signal.SIGTERM, self.shutdown)
 
+    # def run_continuous_production(self, interval: float = 0.0):
+    #     """Run continuous message production with graceful shutdown"""
+    #
+    #     self.running = True
+    #     logger.info('Starting producer for topic %s...', self.topic)
+    #
+    #     try:
+    #         while self.running:
+    #             if self.send_transaction():
+    #                 time.sleep(interval)
+    #     finally:
+    #         self.shutdown()
 
-    def run_continuous_production(self, interval: float = 0.0):
+    def run_continuous_production(self, interval: float = 1.0):  # ✅ Ensure interval > 0
         """Run continuous message production with graceful shutdown"""
-
         self.running = True
-        logger.info(msg='Starting producer for topic %s...', *self.topic)
+        logger.info('Starting producer for topic %s...', self.topic)
 
         try:
             while self.running:
+                logger.info("Looping... sending transaction")  # ✅ Add logging
                 if self.send_transaction():
-                    time.sleep(interval)
+                    time.sleep(interval)  # ✅ Ensure interval > 0
         finally:
             self.shutdown()
 
-    def send_transaction(self)->bool:
+    # def send_transaction(self)->bool:
+    #     try:
+    #         transaction=self.generate_transaction()
+    #         if not transaction:
+    #             return False
+    #         self.producer.produce(
+    #             self.topic,
+    #             key=transaction['transaction_id'],
+    #             value=json.dumps(transaction),
+    #             callback=delivery_report
+    #         )
+    #
+    #         self.producer.poll(0)
+    #         return True
+    #     except Exception as e:
+    #         logger.error('Error producing message:{}'.format(e))
+    #         return False
+
+    def send_transaction(self) -> bool:
         try:
-            transaction=self.generate_transaction()
+            logger.info("Attempting to send a transaction...")  # ✅ Add logging
+            transaction = self.generate_transaction()
+
             if not transaction:
+                logger.warning("No transaction generated.")  # ✅ Add warning log
                 return False
+
+            # ✅ Add validation check before sending
+            if not validate_transaction(transaction):
+                logger.error("Skipping invalid transaction")
+                return False
+
+            logger.info(f"Producing transaction: {json.dumps(transaction, indent=2)}")  # ✅ Log full transaction
+
             self.producer.produce(
                 self.topic,
                 key=transaction['transaction_id'],
                 value=json.dumps(transaction),
-                callback=self.delivery_report
+                callback=delivery_report
             )
 
-            self.producer.poll(0)
+            self.producer.poll(0)  # Ensures messages are processed
             return True
         except Exception as e:
-            logger.error('Error producing message:{}'.format(e))
+            logger.error(f'Error producing message: {e}')
             return False
-
-
-    def delivery_report(self, err, msg):
-        """Usage: Callback function for message delivery reports"""
-
-        if err is not None:
-            logger.error(f"Message delivery failed: {err}")
-        else:
-            logger.info(f"Message delivered to {msg.topic()} [{msg.partition()}]!")
-
 
     def generate_transaction(self) -> Optional[Dict[str,Any]]:
         transaction = {
@@ -118,6 +196,7 @@ class TransactionProducer:
             'location': fake.country_code(),
             'is_fraud': 0
         }
+        logger.info(f"Generated Transaction (before fraud checks): {json.dumps(transaction, indent=2)}")  # ✅ Log before validation
 
         # Extract transaction details
         is_fraud = 0
@@ -146,16 +225,35 @@ class TransactionProducer:
                 is_fraud = 1
                 transaction['amount'] = random.uniform(300, 2000)
 
+        # geographic anomalies
+        if not is_fraud:
+            if user_id % 500 == 0 and random.random() < 0.1:
+                is_fraud = 1
+                transaction['location'] = random.choice(['CN', 'RU', 'GB'])
+
+        # Baseline random fraud (0.1 - 0.3%)
+        if not is_fraud and random.random() < 0.002:
+            is_fraud = 1
+            transaction['amount'] = random.uniform(100, 2000)
+
+        # ensure that final fraud rate is between 1-2%
+        transaction['is_fraud'] = is_fraud if random.random() < 0.985 else 0
+
+        # validate modified transaction
+        if validate_transaction(transaction):
+            return transaction
+
+
     def shutdown(self,signum=None,frame=None):
         if self.running:
-
-            
             logger.info("Initializing shutdown..")
             self.running=False
             if self.producer:
                 self.producer.flush(timeout=30)
-                self.producer.close()
+                # self.producer.close()
             logger.info('Producer stopped')
+
+
 
 if __name__ == "__main__":
     producer = TransactionProducer()

@@ -2,3 +2,5 @@ python-dotenv
 faker
 jsonschema
 confluent-kafka
+pylint
+datetime

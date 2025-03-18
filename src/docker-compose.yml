@@ -318,6 +318,16 @@ services:
     networks:
       - fraud-detection
 
+  producer:
+    build: ./producer
+    env_file: .env
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+    networks:
+      - fraud-detection
 volumes:
   postgres-db-volume:
   minio_data:

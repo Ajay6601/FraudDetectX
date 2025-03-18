@@ -1,0 +1,4 @@
+docker compose --profile flower up -d --build
+
+
+docker compose --profile flower down
