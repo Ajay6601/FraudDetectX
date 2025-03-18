@@ -619,3 +619,89 @@
 [2025-03-17T10:24:46.077+0000] {manager.py:824} INFO - There are 0 files in /opt/airflow/dags
 [2025-03-17T10:29:46.919+0000] {manager.py:821} INFO - Searching for files in /opt/airflow/dags
 [2025-03-17T10:29:46.924+0000] {manager.py:824} INFO - There are 0 files in /opt/airflow/dags
+[2025-03-18T20:27:35.988+0000] {manager.py:483} INFO - Processing files using up to 2 processes at a time 
+[2025-03-18T20:27:35.991+0000] {manager.py:484} INFO - Process each file at most once every 30 seconds
+[2025-03-18T20:27:35.992+0000] {manager.py:485} INFO - Checking for new files in /opt/airflow/dags every 300 seconds
+[2025-03-18T20:27:35.992+0000] {manager.py:821} INFO - Searching for files in /opt/airflow/dags
+[2025-03-18T20:27:36.008+0000] {manager.py:824} INFO - There are 1 files in /opt/airflow/dags
+[2025-03-18T20:27:36.105+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run      Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  ----------  ----------------------
+/opt/airflow/dags/model-training-dag.py     60  0.04s             0           0                                                   0
+================================================================================
+[2025-03-18T20:28:06.412+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run               Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  -------------------  ----------------------
+/opt/airflow/dags/model-training-dag.py     67  0.02s             0           1  0.10s           2025-03-18T20:27:36                       3
+================================================================================
+[2025-03-18T20:28:36.744+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run               Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  -------------------  ----------------------
+/opt/airflow/dags/model-training-dag.py     74  0.01s             0           1  0.15s           2025-03-18T20:28:06                       5
+================================================================================
+[2025-03-18T20:29:07.119+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run               Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  -------------------  ----------------------
+/opt/airflow/dags/model-training-dag.py     81  0.02s             0           1  0.14s           2025-03-18T20:28:36                       5
+================================================================================
+[2025-03-18T20:29:37.464+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run               Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  -------------------  ----------------------
+/opt/airflow/dags/model-training-dag.py     88  0.01s             0           1  0.15s           2025-03-18T20:29:07                       5
+================================================================================
+[2025-03-18T20:30:07.742+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run               Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  -------------------  ----------------------
+/opt/airflow/dags/model-training-dag.py     95  0.01s             0           1  0.12s           2025-03-18T20:29:37                       5
+================================================================================
+[2025-03-18T20:30:38.102+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run               Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  -------------------  ----------------------
+/opt/airflow/dags/model-training-dag.py    102  0.01s             0           1  0.15s           2025-03-18T20:30:07                       5
+================================================================================
+[2025-03-18T20:31:08.409+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run               Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  -------------------  ----------------------
+/opt/airflow/dags/model-training-dag.py    109  0.02s             0           1  0.09s           2025-03-18T20:30:38                       5
+================================================================================
+[2025-03-18T20:31:38.659+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run               Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  -------------------  ----------------------
+/opt/airflow/dags/model-training-dag.py    116  0.01s             0           1  0.13s           2025-03-18T20:31:08                       5
+================================================================================
+[2025-03-18T20:32:08.954+0000] {manager.py:997} INFO - 
+================================================================================
+DAG File Processing Stats
+
+File Path                                  PID  Runtime      # DAGs    # Errors  Last Runtime    Last Run               Last # of DB Queries
+---------------------------------------  -----  ---------  --------  ----------  --------------  -------------------  ----------------------
+/opt/airflow/dags/model-training-dag.py    123  0.01s             0           1  0.09s           2025-03-18T20:31:38                       5
+================================================================================
+[2025-03-18T20:32:35.670+0000] {manager.py:465} INFO - Exiting gracefully upon receiving signal 15
