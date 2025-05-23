@@ -1,0 +1,33 @@
+mlflow:
+  experiment_name: 'fraud_experiment_v1'
+  registered_model_name: 'fraud_detection_xgboost'
+  tracking_url: 'http://mlflow-server:5500'
+  artifact_location: 's3://mlflow/fraud_detection/'  # Specify where to store artifacts
+  s3_endpoint_url: 'http://minio:9000'
+
+kafka:
+  bootstrap_servers: 'pkc-921jm.us-east-2.aws.confluent.cloud:9092'  # Replace with actual broker address
+  username: 'M3Z3LTJXXW5URWP6'
+  password: 'J5mIMIL5yYmM4zEK3NtJzFP2HuQd1D2vDwoVzoWcYpvO7Iv6dVgu/bskNDdGYURd'
+  topic: "transactions"
+  output_topic: "fraud_predictions"
+
+features:
+  source: 'hdfs://namenode:9000/data/fraud_features.parquet'
+  update_frequency: 'daily'  # Can be hourly, daily, weekly
+  feature_store: 'feast'  # Example: Feast or Databricks Feature Store
+
+model:
+  type: 'XGBoost'
+  hyperparameters:
+    learning_rate: 0.05
+    max_depth: 6
+    n_estimators: 100
+  training_data: 'hdfs://namenode:9000/data/training_data.parquet'
+  evaluation_metric: 'AUC'  # Could be accuracy, precision, recall, etc.
+
+spark:
+  master: 'spark://spark-master:7077'
+  executor_memory: '4g'
+  driver_memory: '2g'
+  num_executors: 4
