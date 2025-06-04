@@ -1,0 +1,455 @@
+services:
+  # PostgreSQL (local)
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: fraud_detection
+      POSTGRES_USER: mluser
+      POSTGRES_PASSWORD: mlpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - ml-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mluser -d fraud_detection"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (local)
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - ml-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Spark Master (local)
+  spark-master:
+    image: bitnami/spark:3.4
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_MASTER_WEBUI_PORT=8080
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    volumes:
+      - ./spark-processor:/opt/spark-apps
+      - spark-logs:/opt/spark/logs
+    networks:
+      - ml-network
+
+  # Spark Worker (local)
+  spark-worker:
+    image: bitnami/spark:3.4
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=3G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    depends_on:
+      - spark-master
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./spark-processor:/opt/spark-apps
+      - spark-logs:/opt/spark/logs
+    networks:
+      - ml-network
+
+  # MLflow with PostgreSQL backend
+  mlflow:
+    build:
+      context: ./mlflow
+      dockerfile: Dockerfile
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server 
+      --host 0.0.0.0 
+      --port 5000 
+      --backend-store-uri postgresql://mluser:mlpassword@postgres:5432/fraud_detection
+      --default-artifact-root /mlflow-artifacts
+    volumes:
+      - mlflow-artifacts:/mlflow-artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ml-network
+    restart: unless-stopped
+
+  # Data Generator - connects to YOUR Confluent Cloud
+  data-generator:
+    build:
+      context: ./data-generator
+      dockerfile: Dockerfile
+    container_name: data-generator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - ml-network
+    restart: unless-stopped
+
+  # Spark Processor - reads from YOUR Confluent Cloud
+  spark-processor:
+    build:
+      context: ./spark-processor
+      dockerfile: Dockerfile
+    container_name: spark-processor
+    depends_on:
+      - spark-master
+      - postgres
+      - data-generator
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - ml-network
+    restart: unless-stopped
+
+  # Celery Worker - ML Training
+  celery-worker:
+    build:
+      context: ./ml-training
+      dockerfile: Dockerfile
+    container_name: celery-worker
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    env_file:
+      - .env
+    # Enable events, add more explicit settings
+    command: >
+      celery -A celery_tasks worker 
+      --loglevel=info 
+      --concurrency=2 
+      -E 
+      --events
+      -Q celery,ml_training,ml_evaluation,maintenance
+      --without-heartbeat --without-gossip
+      --pool=prefork
+      --max-tasks-per-child=0
+    volumes:
+      - ./ml-training:/app
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./mlflow/mlflow-artifacts:/app/mlflow-artifacts
+    networks:
+      - ml-network
+    restart: unless-stopped
+
+  # Celery Beat - Scheduler
+  celery-beat:
+    build:
+      context: ./ml-training
+      dockerfile: Dockerfile
+    container_name: celery-beat
+    depends_on:
+      - redis
+      - celery-worker
+    env_file:
+      - .env
+    command: celery -A celery_tasks beat --loglevel=info
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - ml-network
+    restart: unless-stopped
+
+  # Celery Flower - Monitoring
+  celery-flower:
+    build:
+      context: ./ml-training
+      dockerfile: Dockerfile
+    container_name: celery-flower
+    depends_on:
+      - redis
+      - celery-worker
+    env_file:
+      - .env
+    # Update the Flower command
+    command: >
+      celery -A celery_tasks flower 
+      --port=5555 
+      --broker=redis://redis:6379/0
+      --broker_api=redis://redis:6379/0
+      --persistent=True
+      --state_save_interval=60
+    ports:
+      - "5555:5555"
+    networks:
+      - ml-network
+    restart: unless-stopped
+
+  # Airflow PostgreSQL for Airflow metadata
+  airflow-postgres:
+    image: postgres:15-alpine
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+    networks:
+      - ml-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Airflow webserver
+  airflow-webserver:
+    image: apache/airflow:2.5.1-python3.9
+    container_name: airflow-webserver
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/1
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__WEBSERVER__SECRET_KEY=mysecretkey
+      - AIRFLOW_HOME=/opt/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./airflow/requirements.txt:/requirements.txt
+    ports:
+      - "8088:8080"
+    entrypoint: >
+      /bin/bash -c "
+      pip install -r /requirements.txt &&
+          airflow db init &&
+          airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com &&
+          airflow webserver"
+    networks:
+      - ml-network
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Airflow scheduler
+  airflow-scheduler:
+    image: apache/airflow:2.5.1-python3.9
+    container_name: airflow-scheduler
+    depends_on:
+      - airflow-webserver
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/1
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: airflow scheduler
+    networks:
+      - ml-network
+
+  # Airflow worker
+  airflow-worker:
+    image: apache/airflow:2.5.1-python3.9
+    container_name: airflow-worker
+    depends_on:
+      - airflow-webserver
+      - airflow-scheduler
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/1
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@airflow-postgres:5432/airflow
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./data:/opt/airflow/data
+      - ./models:/opt/airflow/models
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: airflow celery worker
+    networks:
+      - ml-network
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:v2.42.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/:/etc/prometheus/
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - ml-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:9.3.6
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning/:/etc/grafana/provisioning/
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    networks:
+      - ml-network
+
+  # Node Exporter for host metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    networks:
+      - ml-network
+
+  # Postgres Exporter
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=postgresql://mluser:mlpassword@postgres:5432/fraud_detection?sslmode=disable
+    restart: unless-stopped
+    networks:
+      - ml-network
+
+  # Redis Exporter
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    restart: unless-stopped
+    networks:
+      - ml-network
+
+  # ML Metrics Exporter
+  ml-metrics:
+    build:
+      context: ./ml-metrics
+      dockerfile: Dockerfile
+    container_name: ml-metrics
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=fraud_detection
+      - POSTGRES_USER=mluser
+      - POSTGRES_PASSWORD=mlpassword
+      - METRICS_PORT=9188
+    ports:
+      - "9188:9188"
+    networks:
+      - ml-network
+    restart: unless-stopped
+
+  # Vault for secrets management
+  vault:
+    image: vault:1.13.0
+    container_name: vault
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./security/vault:/vault/config
+      - vault-data:/vault/file
+    environment:
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_API_ADDR=http://0.0.0.0:8200
+      - VAULT_CONFIG_PATH=/vault/config/config.json
+    cap_add:
+      - IPC_LOCK
+    command: server
+    networks:
+      - ml-network
+
+
+volumes:
+  postgres-data:
+  redis-data:
+  spark-logs:
+  mlflow-artifacts:
+  prometheus-data:
+  airflow-postgres-data:
+  grafana-data:
+  vault-data:
+
+networks:
+  ml-network:
+    driver: bridge
