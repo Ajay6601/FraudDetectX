@@ -8,15 +8,15 @@ namespace: frauddetectx
 
 # Configure secrets
 secretGenerator:
-- name: kafka-credentials
-  literals:
-  - bootstrap-servers=pkc-619z3.us-east1.gcp.confluent.cloud:9092
-  - sasl-username=ZNCQHS4D3VLKIOWO
-  - sasl-password=YXCSd1Nu8YDzPuysT3lheT/tY8iVNrAFRj0xMPtrK+bCAjsx3TS+2IjcQpPqBE9E
-- name: postgres-credentials
-  literals:
-  - username=mluser
-  - password=mlpassword
+  - name: kafka-credentials
+    literals:
+      - bootstrap-servers=pkc-619z3.us-east1.gcp.confluent.cloud:9092
+      - sasl-username=ZNCQHS4D3VLKIOWO
+      - sasl-password=YXCSd1Nu8YDzPuysT3lheT/tY8iVNrAFRj0xMPtrK+bCAjsx3TS+2IjcQpPqBE9E
+  - name: postgres-credentials
+    literals:
+      - username=mluser
+      - password=mlpassword
 
 patches:
   - path: patches/resources.yaml
