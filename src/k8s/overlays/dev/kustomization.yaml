@@ -5,7 +5,7 @@ resources:
   - ../../base
   - namespace.yaml
 
-namespace: frauddetectx
+# namespace: frauddetectx
 
 # Configure resource limits
 patches:
