@@ -29,7 +29,7 @@ images:
     newTag: latest
   - name: ghcr.io/Ajay6601/FraudDetectX/spark-processor
     newTag: latest
-  - name: ghcr.io/Ajay6601/FraudDetectX/ml-training
-    newTag: latest
+  # - name: ghcr.io/Ajay6601/FraudDetectX/ml-training
+  #   newTag: latest
   - name: ghcr.io/Ajay6601/FraudDetectX/ml-metrics
     newTag: latest
