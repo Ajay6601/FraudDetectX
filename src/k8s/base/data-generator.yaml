@@ -40,8 +40,12 @@ spec:
               value: SASL_SSL
             - name: KAFKA_SASL_MECHANISM
               value: PLAIN
+            - name: KAFKA_TOPIC
+              value: transactions
             - name: POSTGRES_HOST
               value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
             - name: POSTGRES_DB
               value: fraud_detection
             - name: POSTGRES_USER
@@ -54,3 +58,11 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: password
+            - name: NUM_TRANSACTIONS
+              value: "100000"
+            - name: FRAUD_RATE
+              value: "0.005"
+            - name: STREAMING_RATE
+              value: "100"
+            - name: LOG_LEVEL
+              value: "INFO"

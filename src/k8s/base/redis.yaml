@@ -1,29 +1,59 @@
-# src/k8s/base/redis.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: redis
+  namespace: frauddetectx
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: frauddetectx
 spec:
-  selector:
-    app: redis
   ports:
     - port: 6379
+      targetPort: 6379
+  selector:
+    app.kubernetes.io/name: redis
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
+  namespace: frauddetectx
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: frauddetectx
 spec:
+  replicas: 1
   selector:
     matchLabels:
-      app: redis
+      app.kubernetes.io/name: redis
   template:
     metadata:
       labels:
-        app: redis
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/part-of: frauddetectx
     spec:
       containers:
         - name: redis
-          image: redis:6.2
+          image: redis:7-alpine
           ports:
             - containerPort: 6379
+          command: ["redis-server", "--appendonly", "yes"]
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: frauddetectx
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

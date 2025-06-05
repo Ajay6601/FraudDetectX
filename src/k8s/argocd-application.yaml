@@ -6,9 +6,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/yourusername/frauddetectx.git  # Replace with your actual repo URL
+    repoURL: https://github.com/Ajay6601/frauddetectx.git  # Replace with your actual repo URL
     targetRevision: HEAD
-    path: k8s/overlays/dev
+    path: src/k8s/overlays/dev
   destination:
     server: https://kubernetes.default.svc
     namespace: frauddetectx
