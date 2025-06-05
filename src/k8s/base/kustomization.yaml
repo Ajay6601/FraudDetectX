@@ -7,6 +7,6 @@ resources:
   - redis.yaml
   - data-generator.yaml
   - spark-processor.yaml
-  - ml-training.yaml
+#  - ml-training.yaml
   - ml-metrics.yaml
   - monitoring.yaml
