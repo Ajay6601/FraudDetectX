@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+namespace: frauddetectx
+
+# Add namespace-specific resources
+resources:
+  - namespace.yaml
+
+# Configure resource limits
+patchesStrategicMerge:
+  - patches/resources.yaml
+
+# Configure secrets
+secretGenerator:
+  - name: kafka-credentials
+    literals:
+      - bootstrap-servers=pkc-619z3.us-east1.gcp.confluent.cloud:9092
+      - sasl-username=ZNCQHS4D3VLKIOWO
+      - sasl-password=YXCSd1Nu8YDzPuysT3lheT/tY8iVNrAFRj0xMPtrK+bCAjsx3TS+2IjcQpPqBE9E
+  - name: postgres-credentials
+    literals:
+      - username=mluser
+      - password=mlpassword
+
+# Configure images
+images:
+  - name: ghcr.io/Ajay6601/FraudDetectX/data-generator
+    newTag: latest
+  - name: ghcr.io/Ajay6601/FraudDetectX/spark-processor
+    newTag: latest
+  - name: ghcr.io/Ajay6601/FraudDetectX/ml-training
+    newTag: latest
+  - name: ghcr.io/Ajay6601/FraudDetectX/ml-metrics
+    newTag: latest

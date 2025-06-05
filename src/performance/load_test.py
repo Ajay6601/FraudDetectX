@@ -8,15 +8,12 @@ import json
 import random
 import uuid
 import threading
-import queue
 import argparse
 import concurrent.futures
 from datetime import datetime, timedelta
 import numpy as np
 from kafka import KafkaProducer
 import psycopg2
-import matplotlib.pyplot as plt
-import pandas as pd
 import logging
 
 logging.basicConfig(
@@ -31,7 +28,7 @@ class LoadTester:
         self.target_tps = target_tps
         self.duration_seconds = duration_seconds
         self.ramp_up_seconds = ramp_up_seconds
-        self.results_queue = queue.Queue()
+        self.results_queue = threading.Queue()
 
         # Kafka configuration
         self.kafka_config = {
@@ -154,98 +151,6 @@ class LoadTester:
         except Exception as e:
             logger.error(f"Thread {thread_id} failed: {e}")
 
-    def monitor_thread(self, stop_event, target_tps, thread_count):
-        """Monitor thread to collect and display results"""
-        results = []
-        thread_final_counts = {}
-
-        # Set up plot
-        plt.figure(figsize=(10, 6))
-        plt.title(f'FraudDetectX Load Test - Target: {target_tps} TPS')
-        plt.xlabel('Time (s)')
-        plt.ylabel('Transactions Per Second')
-        plt.grid(True)
-
-        start_time = time.time()
-        x_data, y_data = [], []
-
-        try:
-            while not stop_event.is_set() or not all(t in thread_final_counts for t in range(thread_count)):
-                try:
-                    # Collect data with timeout
-                    result = self.results_queue.get(timeout=0.5)
-                    results.append(result)
-
-                    # Store final counts
-                    if result.get('final', False):
-                        thread_final_counts[result['thread_id']] = result['sent_count']
-
-                    # Update real-time plot
-                    if len(results) % 10 == 0:
-                        df = pd.DataFrame(results)
-                        if not df.empty:
-                            df['relative_time'] = df['timestamp'] - start_time
-                            # Group by second and sum
-                            tps_data = df.groupby(df['relative_time'].astype(int))['sent_count'].diff().fillna(df['sent_count'])
-                            tps_by_second = tps_data.groupby(df['relative_time'].astype(int)).sum()
-
-                            x_data = list(tps_by_second.index)
-                            y_data = list(tps_by_second.values)
-
-                            plt.clf()
-                            plt.plot(x_data, y_data, 'b-')
-                            plt.axhline(y=target_tps, color='r', linestyle='--', label=f'Target: {target_tps} TPS')
-                            plt.legend()
-                            plt.title(f'FraudDetectX Load Test - Target: {target_tps} TPS')
-                            plt.xlabel('Time (s)')
-                            plt.ylabel('Transactions Per Second')
-                            plt.grid(True)
-                            plt.pause(0.01)
-
-                except queue.Empty:
-                    continue
-
-        except Exception as e:
-            logger.error(f"Monitor thread error: {e}")
-
-        finally:
-            # Save final results
-            if results:
-                total_sent = sum(thread_final_counts.values()) if thread_final_counts else sum(r['sent_count'] for r in results if r.get('final', False))
-                total_time = time.time() - start_time
-                average_tps = total_sent / total_time if total_time > 0 else 0
-
-                logger.info(f"Load test completed: {total_sent} transactions in {total_time:.2f}s")
-                logger.info(f"Average throughput: {average_tps:.2f} TPS")
-
-                # Create final plot
-                plt.figure(figsize=(12, 8))
-                plt.plot(x_data, y_data, 'b-', label='Actual TPS')
-                plt.axhline(y=target_tps, color='r', linestyle='--', label=f'Target: {target_tps} TPS')
-                plt.axhline(y=average_tps, color='g', linestyle='-.', label=f'Average: {average_tps:.2f} TPS')
-                plt.title(f'FraudDetectX Load Test Results - {total_sent} Transactions')
-                plt.xlabel('Time (s)')
-                plt.ylabel('Transactions Per Second')
-                plt.legend()
-                plt.grid(True)
-                plt.savefig(f'load_test_results_{int(time.time())}.png')
-
-                # Save CSV data
-                if results:
-                    pd.DataFrame(results).to_csv(f'load_test_raw_{int(time.time())}.csv', index=False)
-
-                # Check database counts
-                try:
-                    conn = psycopg2.connect(**self.db_params)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT COUNT(*) FROM transactions WHERE created_at >= %s", (datetime.now() - timedelta(hours=1),))
-                    db_count = cursor.fetchone()[0]
-                    logger.info(f"Database transaction count (last hour): {db_count}")
-                    logger.info(f"Kafka to database ratio: {db_count/total_sent:.2%}")
-                    conn.close()
-                except Exception as e:
-                    logger.error(f"Could not check database counts: {e}")
-
     def run_load_test(self, thread_count=4):
         """Run a load test with multiple threads"""
         logger.info(f"Starting load test: {self.target_tps} TPS for {self.duration_seconds}s using {thread_count} threads")
@@ -264,9 +169,6 @@ class LoadTester:
                 future = executor.submit(self.producer_thread, i, stop_event, tps_per_thread)
                 threads.append(future)
 
-            # Start monitor thread
-            monitor_future = executor.submit(self.monitor_thread, stop_event, self.target_tps, thread_count)
-
             # Wait for duration
             time.sleep(self.duration_seconds)
 
@@ -277,24 +179,42 @@ class LoadTester:
             # Wait for all threads
             concurrent.futures.wait(threads)
 
-            # Wait for monitor to finish
-            monitor_future.result()
-
         logger.info("Load test completed")
+
+        # Calculate results
+        total_sent = 0
+        for thread_id in range(thread_count):
+            # Check database for sent transactions
+            try:
+                conn = psycopg2.connect(**self.db_params)
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT COUNT(*) FROM transactions 
+                    WHERE created_at >= %s
+                """, (datetime.now() - timedelta(minutes=5),))
+                db_count = cursor.fetchone()[0]
+                conn.close()
+
+                logger.info(f"Database transaction count (last 5 minutes): {db_count}")
+                total_sent = db_count
+
+            except Exception as e:
+                logger.error(f"Database query failed: {e}")
+
+        logger.info(f"Load test results: Sent approximately {total_sent} transactions")
+        logger.info(f"Approximate throughput: {total_sent/self.duration_seconds:.2f} TPS")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='FraudDetectX Load Tester')
     parser.add_argument('--tps', type=int, default=1000, help='Target transactions per second')
     parser.add_argument('--duration', type=int, default=60, help='Test duration in seconds')
     parser.add_argument('--threads', type=int, default=4, help='Number of producer threads')
-    parser.add_argument('--ramp-up', type=int, default=10, help='Ramp-up time in seconds')
 
     args = parser.parse_args()
 
     tester = LoadTester(
         target_tps=args.tps,
-        duration_seconds=args.duration,
-        ramp_up_seconds=args.ramp_up
+        duration_seconds=args.duration
     )
 
     tester.run_load_test(thread_count=args.threads)

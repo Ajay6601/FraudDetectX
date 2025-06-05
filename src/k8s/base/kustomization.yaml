@@ -5,8 +5,8 @@ resources:
   - namespace.yaml
   - postgres.yaml
   - redis.yaml
-  - spark.yaml
+  - data-generator.yaml
+  - spark-processor.yaml
   - ml-training.yaml
+  - ml-metrics.yaml
   - monitoring.yaml
-  - mlflow.yaml
-  - airflow.yaml

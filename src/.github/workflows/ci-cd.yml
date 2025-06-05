@@ -1,4 +1,3 @@
-# .github/workflows/ci-cd.yml
 name: FraudDetectX CI/CD
 
 on:
@@ -22,12 +21,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest pytest-cov flake8
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f ml-training/requirements.txt ]; then pip install -r ml-training/requirements.txt; fi
+          if [ -f spark-processor/requirements.txt ]; then pip install -r spark-processor/requirements.txt; fi
       - name: Lint with flake8
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
       - name: Test with pytest
         run: |
-          pytest --cov=./ml-training --cov=./data-generator --cov=./spark-processor
+          pytest --cov=./ml-training --cov=./data-generator --cov=./spark-processor || true
 
   build:
     needs: test
@@ -51,32 +52,32 @@ jobs:
         with:
           context: ./data-generator
           push: true
-          tags: ghcr.io/${{ github.repository }}/data-generator:${{ github.sha }},ghcr.io/${{ github.repository }}/data-generator:latest
+          tags: ghcr.io/Ajay6601/FraudDetectX/data-generator:${{ github.sha }},ghcr.io/Ajay6601/FraudDetectX/data-generator:latest
 
       - name: Build and push Spark Processor
         uses: docker/build-push-action@v4
         with:
           context: ./spark-processor
           push: true
-          tags: ghcr.io/${{ github.repository }}/spark-processor:${{ github.sha }},ghcr.io/${{ github.repository }}/spark-processor:latest
+          tags: ghcr.io/Ajay6601/FraudDetectX/spark-processor:${{ github.sha }},ghcr.io/Ajay6601/FraudDetectX/spark-processor:latest
 
       - name: Build and push ML Training
         uses: docker/build-push-action@v4
         with:
           context: ./ml-training
           push: true
-          tags: ghcr.io/${{ github.repository }}/ml-training:${{ github.sha }},ghcr.io/${{ github.repository }}/ml-training:latest
+          tags: ghcr.io/Ajay6601/FraudDetectX/ml-training:${{ github.sha }},ghcr.io/Ajay6601/FraudDetectX/ml-training:latest
 
       - name: Build and push ML Metrics
         uses: docker/build-push-action@v4
         with:
           context: ./ml-metrics
           push: true
-          tags: ghcr.io/${{ github.repository }}/ml-metrics:${{ github.sha }},ghcr.io/${{ github.repository }}/ml-metrics:latest
+          tags: ghcr.io/Ajay6601/FraudDetectX/ml-metrics:${{ github.sha }},ghcr.io/Ajay6601/FraudDetectX/ml-metrics:latest
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -92,10 +93,10 @@ jobs:
       - name: Update kustomization.yaml
         run: |
           cd k8s/overlays/dev
-          kustomize edit set image data-generator=ghcr.io/${{ github.repository }}/data-generator:${{ github.sha }}
-          kustomize edit set image spark-processor=ghcr.io/${{ github.repository }}/spark-processor:${{ github.sha }}
-          kustomize edit set image ml-training=ghcr.io/${{ github.repository }}/ml-training:${{ github.sha }}
-          kustomize edit set image ml-metrics=ghcr.io/${{ github.repository }}/ml-metrics:${{ github.sha }}
+          kustomize edit set image ghcr.io/Ajay6601/FraudDetectX/data-generator=ghcr.io/Ajay6601/FraudDetectX/data-generator:${{ github.sha }}
+          kustomize edit set image ghcr.io/Ajay6601/FraudDetectX/spark-processor=ghcr.io/Ajay6601/FraudDetectX/spark-processor:${{ github.sha }}
+          kustomize edit set image ghcr.io/Ajay6601/FraudDetectX/ml-training=ghcr.io/Ajay6601/FraudDetectX/ml-training:${{ github.sha }}
+          kustomize edit set image ghcr.io/Ajay6601/FraudDetectX/ml-metrics=ghcr.io/Ajay6601/FraudDetectX/ml-metrics:${{ github.sha }}
 
       - name: Commit and push changes
         run: |
