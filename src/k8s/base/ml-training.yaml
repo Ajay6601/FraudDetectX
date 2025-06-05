@@ -17,6 +17,8 @@ spec:
       containers:
         - name: ml-training
           image: ghcr.io/ajay6601/frauddetectx/ml-training:latest
+          imagePullPolicy: Always
+          command: ["celery", "-A", "celery_tasks", "worker", "--loglevel=info", "--concurrency=2"]
           env:
             - name: POSTGRES_HOST
               value: postgres
@@ -41,6 +43,13 @@ spec:
           volumeMounts:
             - name: models-volume
               mountPath: /app/models
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
       volumes:
         - name: models-volume
           emptyDir: {}

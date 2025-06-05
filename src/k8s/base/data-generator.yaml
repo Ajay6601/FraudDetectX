@@ -17,6 +17,7 @@ spec:
       containers:
         - name: data-generator
           image: ghcr.io/ajay6601/frauddetectx/data-generator:latest
+          imagePullPolicy: Always
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
@@ -51,3 +52,10 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: password
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "200m"

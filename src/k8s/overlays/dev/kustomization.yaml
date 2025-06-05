@@ -17,6 +17,3 @@ secretGenerator:
     literals:
       - username=mluser
       - password=mlpassword
-
-patches:
-  - path: patches/resources.yaml
