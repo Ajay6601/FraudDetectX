@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/Ajay6601/frauddetectx.git  # Replace with your actual repo URL
+    repoURL: https://github.com/Ajay6601/FraudDetectX.git  # Replace with your actual repo URL
     targetRevision: HEAD
     path: src/k8s/overlays/dev
   destination:

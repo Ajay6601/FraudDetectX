@@ -1,114 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: spark-master
-  namespace: frauddetectx
+  name: ml-training
   labels:
-    app.kubernetes.io/name: spark-master
-    app.kubernetes.io/part-of: frauddetectx
+    app: ml-training
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: spark-master
+      app: ml-training
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: spark-master
-        app.kubernetes.io/part-of: frauddetectx
+        app: ml-training
     spec:
       containers:
-        - name: spark-master
-          image: bitnami/spark:3.3
-          ports:
-            - containerPort: 7077
-            - containerPort: 8080
+        - name: ml-training
+          image: ghcr.io/ajay6601/frauddetectx/ml-training:latest
           env:
-            - name: SPARK_MODE
-              value: master
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: spark-worker
-  namespace: frauddetectx
-  labels:
-    app.kubernetes.io/name: spark-worker
-    app.kubernetes.io/part-of: frauddetectx
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: spark-worker
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: spark-worker
-        app.kubernetes.io/part-of: frauddetectx
-    spec:
-      containers:
-        - name: spark-worker
-          image: bitnami/spark:3.3
-          ports:
-            - containerPort: 8081
-          env:
-            - name: SPARK_MODE
-              value: worker
-            - name: SPARK_MASTER_URL
-              value: spark://spark-master:7077
-            - name: SPARK_WORKER_MEMORY
-              value: "2G"
-            - name: SPARK_WORKER_CORES
-              value: "2"
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: spark-processor
-  namespace: frauddetectx
-  labels:
-    app.kubernetes.io/name: spark-processor
-    app.kubernetes.io/part-of: frauddetectx
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: spark-processor
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: spark-processor
-        app.kubernetes.io/part-of: frauddetectx
-    spec:
-      containers:
-        - name: spark-processor
-          image: ghcr.io/Ajay6601/FraudDetectX/spark-processor:latest
-          env:
-            - name: KAFKA_BOOTSTRAP_SERVERS
-              valueFrom:
-                secretKeyRef:
-                  name: kafka-credentials
-                  key: bootstrap-servers
-            - name: KAFKA_SASL_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: kafka-credentials
-                  key: sasl-username
-            - name: KAFKA_SASL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: kafka-credentials
-                  key: sasl-password
-            - name: KAFKA_SECURITY_PROTOCOL
-              value: SASL_SSL
-            - name: KAFKA_SASL_MECHANISM
-              value: PLAIN
-            - name: KAFKA_TOPIC
-              value: transactions
             - name: POSTGRES_HOST
               value: postgres
-            - name: POSTGRES_PORT
-              value: "5432"
             - name: POSTGRES_DB
               value: fraud_detection
             - name: POSTGRES_USER
@@ -121,5 +32,28 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: password
-            - name: SPARK_MASTER_URL
-              value: spark://spark-master:7077
+            - name: REDIS_HOST
+              value: redis
+            - name: CELERY_BROKER_URL
+              value: redis://redis:6379/0
+            - name: CELERY_RESULT_BACKEND
+              value: redis://redis:6379/0
+          volumeMounts:
+            - name: models-volume
+              mountPath: /app/models
+      volumes:
+        - name: models-volume
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-training
+  labels:
+    app: ml-training
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+  selector:
+    app: ml-training

@@ -2,24 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: data-generator
-  namespace: frauddetectx
   labels:
-    app.kubernetes.io/name: data-generator
-    app.kubernetes.io/part-of: frauddetectx
+    app: data-generator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: data-generator
+      app: data-generator
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: data-generator
-        app.kubernetes.io/part-of: frauddetectx
+        app: data-generator
     spec:
       containers:
         - name: data-generator
-          image: ghcr.io/Ajay6601/FraudDetectX/data-generator:latest
+          image: ghcr.io/ajay6601/frauddetectx/data-generator:latest
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
@@ -40,12 +37,8 @@ spec:
               value: SASL_SSL
             - name: KAFKA_SASL_MECHANISM
               value: PLAIN
-            - name: KAFKA_TOPIC
-              value: transactions
             - name: POSTGRES_HOST
               value: postgres
-            - name: POSTGRES_PORT
-              value: "5432"
             - name: POSTGRES_DB
               value: fraud_detection
             - name: POSTGRES_USER
@@ -58,11 +51,3 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: password
-            - name: NUM_TRANSACTIONS
-              value: "100000"
-            - name: FRAUD_RATE
-              value: "0.005"
-            - name: STREAMING_RATE
-              value: "100"
-            - name: LOG_LEVEL
-              value: "INFO"

@@ -1,31 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: data-generator
-  namespace: frauddetectx
+  name: ml-training
 spec:
   template:
     spec:
       containers:
-        - name: data-generator
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "512Mi"
-              cpu: "200m"
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: spark-processor
-  namespace: frauddetectx
-spec:
-  template:
-    spec:
-      containers:
-        - name: spark-processor
+        - name: ml-training
           resources:
             requests:
               memory: "1Gi"
@@ -37,17 +18,16 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ml-training
-  namespace: frauddetectx
+  name: data-generator
 spec:
   template:
     spec:
       containers:
-        - name: ml-training
+        - name: data-generator
           resources:
             requests:
-              memory: "2Gi"
-              cpu: "1000m"
+              memory: "256Mi"
+              cpu: "100m"
             limits:
-              memory: "4Gi"
-              cpu: "2000m"
+              memory: "512Mi"
+              cpu: "300m"

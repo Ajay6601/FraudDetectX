@@ -3,13 +3,8 @@ kind: Kustomization
 
 resources:
   - ../../base
-  - namespace.yaml
 
 namespace: frauddetectx
-
-# Configure resource limits
-patches:
-  - path: patches/resources.yaml
 
 # Configure secrets
 secretGenerator:
@@ -23,13 +18,5 @@ secretGenerator:
       - username=mluser
       - password=mlpassword
 
-# Configure images
-images:
-  - name: ghcr.io/Ajay6601/FraudDetectX/data-generator
-    newTag: latest
-  - name: ghcr.io/Ajay6601/FraudDetectX/spark-processor
-    newTag: latest
-  - name: ghcr.io/Ajay6601/FraudDetectX/ml-training
-    newTag: latest
-  - name: ghcr.io/Ajay6601/FraudDetectX/ml-metrics
-    newTag: latest
+patches:
+  - path: patches/resources.yaml
