@@ -198,9 +198,9 @@ Several technical decisions proved particularly effective:
 ## Running the Project
 
 To run this project:
+```bash
 
 1. **Set up infrastructure**:
-```bash
 # Set up Kubernetes cluster
 gcloud container clusters create frauddetectx-cluster \
   --zone us-central1-a \
