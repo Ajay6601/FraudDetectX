@@ -42,7 +42,7 @@ The FraudDetectX platform implements a modern microservices architecture followi
 
 The primary objective of FraudDetectX is to build a production-ready fraud detection system capable of:
 
-1. Processing 100,000+ transactions per second through a streaming architecture
+1. Processing 220,000+ transactions per second through a streaming architecture
 2. Identifying multiple fraud types (card fraud, account takeover, digital payment fraud)
 3. Achieving high accuracy (99.6%) and precision (85%) with minimal false positives
 4. Providing real-time monitoring and visualization of system performance
