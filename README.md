@@ -198,6 +198,7 @@ Several technical decisions proved particularly effective:
 ## Running the Project
 
 To run this project:
+```bash
 
 1. **Set up infrastructure**:
 # Set up Kubernetes cluster
