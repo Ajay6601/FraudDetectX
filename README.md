@@ -6,7 +6,7 @@ FraudDetectX is a comprehensive machine learning system designed to detect fraud
 
 ## Architecture
 
-![FraudDetectX Architecture](./docs/architecture.gif)
+![FraudDetectX Architecture](.architecture.png)
 
 The FraudDetectX platform implements a modern microservices architecture following MLOps best practices:
 
