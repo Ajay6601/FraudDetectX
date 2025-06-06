@@ -200,7 +200,6 @@ Several technical decisions proved particularly effective:
 To run this project:
 
 1. **Set up infrastructure**:
-```bash
 # Set up Kubernetes cluster
 gcloud container clusters create frauddetectx-cluster \
   --zone us-central1-a \
