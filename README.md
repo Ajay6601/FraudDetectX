@@ -226,7 +226,6 @@ kubectl port-forward -n frauddetectx svc/grafana 3000:3000
 # MLflow UI
 kubectl port-forward -n frauddetectx svc/mlflow 5000:5000
 
-'''
 
 Conclusion:
 
