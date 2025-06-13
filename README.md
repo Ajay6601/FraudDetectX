@@ -226,6 +226,8 @@ kubectl port-forward -n frauddetectx svc/grafana 3000:3000
 # MLflow UI
 kubectl port-forward -n frauddetectx svc/mlflow 5000:5000
 
+'''
+
 Conclusion:
 
 FraudDetectX demonstrates how modern MLOps practices can be applied to build a production-grade fraud detection system. By combining streaming data processing, advanced ML techniques, and GitOps deployment, we've created a platform that not only detects fraud effectively but also provides the infrastructure for continuous improvement and monitoring.
